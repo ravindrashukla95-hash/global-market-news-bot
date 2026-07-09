@@ -25,6 +25,13 @@ RSS_FEEDS = {
     ],
 }
 
+# ── Public Telegram wire channels (scraped via t.me/s/<channel>, no API key) ──
+# Each entry is just a channel username (no @). Categories are auto-detected
+# per-post from the text — see _classify_wire_text() in sources.py.
+TELEGRAM_WIRE_CHANNELS = [
+    "Indiaredboxglobal",  # Redbox Global India — free public mirror of the RedboxWire terminal feed (delayed, partial)
+]
+
 # ── Google News search queries (category -> query text) ───
 # Encoded + fetched dynamically in sources.py, so special characters here are fine.
 GOOGLE_NEWS_QUERIES = {

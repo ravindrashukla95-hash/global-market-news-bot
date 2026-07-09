@@ -35,6 +35,11 @@ India markets, and global markets — in one Telegram feed, styled like a
   `BREAKING_KEYWORDS` for what counts as "JUST IN" vs "Update".
 - `MAX_POSTS_PER_RUN` and the cron interval control posting cadence —
   keep them balanced so you don't hit Telegram's flood limits.
+- `TELEGRAM_WIRE_CHANNELS` in `config.py` → add more public Telegram
+  channel usernames (no `@`) to pull in as wire sources. Each one is
+  scraped via its read-only `t.me/s/<channel>` preview page — no login
+  or API key needed. Currently includes `Indiaredboxglobal`, a free
+  public mirror of the RedboxWire market-news terminal feed.
 - Slot your existing BSE/NSE corporate-announcement scraper into
   `sources.fetch_all_sources()` to fold India corp-action alerts into
   this same public feed instead of running a second bot.
@@ -46,3 +51,11 @@ India markets, and global markets — in one Telegram feed, styled like a
   fine for a news feed, not for sub-minute latency needs.
 - Chart generation currently covers BTC only; extend `charts.py` with
   `yfinance` for equity/index charts (e.g. Nifty, SPX) the same way.
+- The Telegram wire scraper (`fetch_telegram_channel` in `sources.py`)
+  reads Telegram's public HTML preview page, not an official API —
+  it's the same technique RSS-bridge tools use, but Telegram could
+  change that page's markup at any time, which would silently stop
+  that source (everything else keeps working; check logs for
+  `failed to fetch telegram channel`). The `Indiaredboxglobal` mirror
+  is also explicitly a **delayed, partial** feed — full real-time
+  coverage requires Redbox's paid terminal (redboxglobal.com).
