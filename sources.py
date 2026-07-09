@@ -75,12 +75,33 @@ def _parse_telegram_datetime(time_tag):
         return None
 
 
+# Posts containing any of these are dropped entirely — either self-promo for
+# the source channel (app installs, subscribe/trial pitches) or a mention of
+# its own brand name. We never want the source's name or a link back to it
+# reaching our subscribers, so anything that even mentions it is discarded
+# rather than edited (safer than trying to surgically strip a brand name out
+# of a sentence).
+_WIRE_EXCLUDE_KEYWORDS = [
+    "redbox", "play store", "app store", "free trial", "download now",
+    "subscribe", "apk", "signup", "sign up",
+]
+
+
+def _is_wire_post_excluded(title):
+    title_lower = title.lower()
+    return any(kw in title_lower for kw in _WIRE_EXCLUDE_KEYWORDS)
+
+
 def fetch_telegram_channel(channel, limit=30):
-    """Scrape a public Telegram channel's read-only preview page (t.me/s/<channel>).
-    No login/API key needed — this is the same page Telegram serves to search
-    engines and to logged-out visitors. Used here for the free, public
-    'Redboxglobal India' mirror of the RedboxWire market wire (delayed, and
-    only a subset of the full paid feed, but ₹0 and no signup required).
+    """Scrape a public Telegram channel's read-only preview page (t.me/s/<channel>)
+    for its plain-text market-wire posts. No login/API key needed — this is
+    the same page Telegram serves to search engines and logged-out visitors.
+
+    Deliberately anonymized on the way out: no source name and no link back
+    to the origin channel are attached to any item, so our own subscribers
+    have no way to find and follow the upstream channel instead of ours.
+    Any post that mentions the source's own brand or is self-promotional
+    (app download, subscribe/trial pitches, etc.) is dropped outright.
     """
     url = f"https://t.me/s/{channel}"
     items = []
@@ -93,16 +114,14 @@ def fetch_telegram_channel(channel, limit=30):
             if not text_div:
                 continue  # skip photo/file-only posts with no caption
             title = text_div.get_text(" ", strip=True)
-            if not title:
+            if not title or _is_wire_post_excluded(title):
                 continue
-            link_tag = msg.select_one("a.tgme_widget_message_date")
-            link = link_tag["href"] if link_tag and link_tag.get("href") else url
             items.append({
                 "title": title,
-                "link": link,
+                "link": "",  # intentionally no link back to the source channel
                 "published": _parse_telegram_datetime(msg.select_one("time")),
                 "category": _classify_wire_text(title),
-                "source": f"Telegram: {channel}",
+                "source": "wire",  # internal only — never rendered in the posted message
             })
     except Exception as e:
         print(f"[sources] failed to fetch telegram channel {channel}: {e}")
