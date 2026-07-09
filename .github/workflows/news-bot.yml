@@ -2,7 +2,7 @@ name: Global Market News Bot
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/10 * * * *"  # re-registered: refreshing schedule activation
   workflow_dispatch:
 
 jobs:
