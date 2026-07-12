@@ -1,8 +1,10 @@
 import re
 import time
-import calendar
 
-from config import FLAG_MAP, CATEGORY_EMOJI, BREAKING_KEYWORDS, LOOKBACK_MINUTES
+from config import (
+    FLAG_MAP, CATEGORY_EMOJI, BREAKING_KEYWORDS, ROUTING_KEYWORDS,
+    LOOKBACK_MINUTES,
+)
 
 
 def extract_flags(title):
@@ -19,15 +21,25 @@ def extract_flags(title):
 
 
 def is_breaking(title):
+    """Cosmetic only — drives the 'JUST IN' prefix / display priority.
+    Deliberately kept separate from is_routing_match()/ROUTING_KEYWORDS
+    below, which is the new immediate-post-vs-queue routing decision."""
     title_lower = title.lower()
     return any(kw in title_lower for kw in BREAKING_KEYWORDS)
 
 
-def is_recent(published_struct):
-    if not published_struct:
+def is_routing_match(item):
+    """The spec's keyword check: title/content match -> post immediately,
+    bypassing the queue entirely. Applied identically to every source
+    (no special-casing by source, including Trump's posts)."""
+    text = f"{item.get('title', '')} {item.get('summary', '')}".lower()
+    return any(kw in text for kw in ROUTING_KEYWORDS)
+
+
+def is_recent(published_epoch):
+    if not published_epoch:
         return True  # some feeds omit dates — don't discard, just skip the age check
-    published_ts = calendar.timegm(published_struct)
-    age_minutes = (time.time() - published_ts) / 60
+    age_minutes = (time.time() - published_epoch) / 60
     return age_minutes <= LOOKBACK_MINUTES
 
 
@@ -36,6 +48,7 @@ def enrich(item):
     item["breaking"] = is_breaking(item["title"])
     item["category_emoji"] = CATEGORY_EMOJI.get(item["category"], "📰")
     item["priority"] = 2 if item["breaking"] else 1
+    item["routing_match"] = is_routing_match(item)
     return item
 
 

@@ -2,8 +2,18 @@ name: Global Market News Bot
 
 on:
   schedule:
-    - cron: "*/10 * * * *"  # re-registered: refreshing schedule activation
+    - cron: "*/10 * * * *"  # every 10 minutes
   workflow_dispatch:
+
+# Overlap safety: draining the queue can take up to ~8 minutes (8 items x
+# 1-minute spacing), and the cron fires every 10 minutes, so a slow run can
+# still be posting when the next trigger fires. This concurrency group makes
+# GitHub Actions QUEUE the next run instead of starting it in parallel or
+# skipping it — cancel-in-progress: false means a waiting run is held, not
+# canceled, so it starts as soon as the in-progress run finishes.
+concurrency:
+  group: news-bot-run
+  cancel-in-progress: false
 
 jobs:
   run-bot:
@@ -30,6 +40,7 @@ jobs:
         run: |
           git config user.name "news-bot"
           git config user.email "actions@github.com"
-          git add state.json last_run.txt
+          git add state.json queue.json last_run.txt
           git diff --cached --quiet || git commit -m "update state [skip ci]"
           git push
+

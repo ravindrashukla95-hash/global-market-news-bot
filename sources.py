@@ -1,3 +1,4 @@
+import calendar
 import urllib.parse
 from datetime import datetime, timezone
 
@@ -34,10 +35,19 @@ def _parse_feed(url, category):
     try:
         feed = feedparser.parse(url)
         for entry in feed.entries:
+            struct_time = entry.get("published_parsed") or entry.get("updated_parsed")
             items.append({
                 "title": entry.get("title", "").strip(),
+                # Kept for the keyword-routing check ("check title/content")
+                # in classify.is_routing_match() — never rendered in the
+                # posted message, format_caption() only uses "title".
+                "summary": entry.get("summary", "").strip(),
                 "link": entry.get("link", ""),
-                "published": entry.get("published_parsed") or entry.get("updated_parsed"),
+                # Store as epoch seconds (JSON-serializable) rather than the
+                # raw time.struct_time — items that end up in the queue get
+                # persisted to queue.json between runs, so nothing in the
+                # item dict can be a non-serializable Python object.
+                "published": calendar.timegm(struct_time) if struct_time else None,
                 "category": category,
                 "source": feed.feed.get("title", url),
             })
@@ -66,11 +76,14 @@ def fetch_google_news_sources():
 
 
 def _parse_telegram_datetime(time_tag):
+    """Returns epoch seconds (int) — same representation _parse_feed() uses
+    for "published" — so every item dict is JSON-serializable regardless of
+    source, since non-matching items get persisted to queue.json."""
     if not time_tag or not time_tag.get("datetime"):
         return None
     try:
         dt = datetime.fromisoformat(time_tag["datetime"])
-        return dt.astimezone(timezone.utc).timetuple()
+        return int(dt.astimezone(timezone.utc).timestamp())
     except Exception:
         return None
 
@@ -118,6 +131,7 @@ def fetch_telegram_channel(channel, limit=30):
                 continue
             items.append({
                 "title": title,
+                "summary": "",  # wire posts have no separate title/body split
                 "link": "",  # intentionally no link back to the source channel
                 "published": _parse_telegram_datetime(msg.select_one("time")),
                 "category": _classify_wire_text(title),
